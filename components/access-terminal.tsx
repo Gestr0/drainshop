@@ -137,11 +137,6 @@ export function AccessTerminal() {
           )}
         </div>
       </div>
-
-      <p className="mt-3 px-1 text-center text-[10px] leading-relaxed text-muted-foreground/70">
-        Demo interface — payment verification is simulated client-side. Never send
-        funds based on an unaudited interface.
-      </p>
     </div>
   )
 }

@@ -17,11 +17,7 @@ export default function Home() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col items-center gap-10 px-6 py-10 lg:flex-row lg:justify-between lg:gap-16 lg:py-16">
         {/* left: identity + globe */}
         <section className="flex w-full flex-col items-center text-center lg:items-start lg:text-left">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-primary text-glow">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            live node // online
-          </div>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground text-balance sm:text-5xl">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground text-balance sm:text-5xl">
             DRAIN<span className="text-primary text-glow">SHOP</span>
           </h1>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
