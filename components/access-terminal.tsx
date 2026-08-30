@@ -22,7 +22,11 @@ import {
 type Mode = 'acquire' | 'login'
 type Step = 'intro' | 'pay' | 'verifying' | 'issued'
 
-export function AccessTerminal() {
+export function AccessTerminal({
+  onGranted,
+}: {
+  onGranted?: (key: string) => void
+}) {
   const [mode, setMode] = useState<Mode>('acquire')
   const [step, setStep] = useState<Step>('intro')
   const [issuedKey, setIssuedKey] = useState('')
@@ -66,6 +70,7 @@ export function AccessTerminal() {
     }
     setLoginError('')
     setGranted(true)
+    onGranted?.(key)
   }
 
   return (
