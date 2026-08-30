@@ -4,17 +4,82 @@ import { useEffect, useRef } from 'react'
 
 type Vec3 = { x: number; y: number; z: number }
 
-// evenly distribute N points on a unit sphere (fibonacci sphere)
-function fibonacciSphere(n: number): Vec3[] {
-  const pts: Vec3[] = []
-  const golden = Math.PI * (3 - Math.sqrt(5))
-  for (let i = 0; i < n; i++) {
-    const y = 1 - (i / (n - 1)) * 2
-    const r = Math.sqrt(1 - y * y)
-    const theta = golden * i
-    pts.push({ x: Math.cos(theta) * r, y, z: Math.sin(theta) * r })
+// --- Coarse continent outlines as [lon, lat] rings (recognizable, not exact) ---
+const CONTINENTS: number[][][] = [
+  // North America
+  [
+    [-168, 66], [-166, 68], [-156, 71], [-130, 70], [-124, 73], [-100, 74],
+    [-92, 74], [-82, 73], [-80, 67], [-70, 63], [-64, 60], [-56, 52],
+    [-66, 45], [-70, 41], [-74, 40], [-76, 35], [-81, 25], [-84, 30],
+    [-90, 29], [-97, 26], [-97, 20], [-105, 20], [-110, 23], [-115, 29],
+    [-117, 33], [-121, 35], [-124, 40], [-124, 48], [-130, 54], [-135, 58],
+    [-140, 60], [-150, 60], [-158, 58], [-165, 60], [-168, 66],
+  ],
+  // Greenland
+  [
+    [-45, 60], [-42, 64], [-38, 66], [-30, 68], [-22, 70], [-18, 74],
+    [-22, 78], [-30, 82], [-40, 83], [-50, 82], [-58, 80], [-55, 74],
+    [-50, 68], [-48, 63], [-45, 60],
+  ],
+  // South America
+  [
+    [-81, 8], [-77, 8], [-72, 11], [-64, 10], [-60, 5], [-51, 0], [-50, -2],
+    [-48, -6], [-42, -6], [-38, -12], [-40, -20], [-48, -25], [-53, -34],
+    [-58, -40], [-65, -45], [-68, -50], [-70, -54], [-73, -53], [-74, -45],
+    [-73, -37], [-71, -30], [-71, -20], [-70, -18], [-76, -14], [-81, -6],
+    [-81, -2], [-80, 2], [-78, 5], [-81, 8],
+  ],
+  // Africa
+  [
+    [-17, 15], [-16, 20], [-10, 27], [-5, 32], [0, 34], [10, 37], [11, 33],
+    [20, 32], [25, 32], [32, 31], [34, 28], [37, 22], [38, 15], [43, 11],
+    [51, 12], [51, 7], [48, 2], [42, -2], [40, -8], [39, -15], [35, -20],
+    [33, -26], [28, -33], [22, -34], [18, -34], [16, -28], [14, -22],
+    [13, -16], [9, -3], [9, 3], [3, 6], [-4, 5], [-8, 4], [-13, 8], [-17, 15],
+  ],
+  // Eurasia
+  [
+    [-10, 36], [-9, 43], [-2, 43], [0, 48], [-5, 48], [-4, 54], [2, 58],
+    [5, 61], [8, 63], [12, 65], [15, 68], [22, 70], [28, 71], [40, 73],
+    [55, 73], [70, 73], [85, 74], [100, 76], [110, 74], [125, 73], [140, 72],
+    [160, 70], [170, 68], [178, 67], [175, 62], [162, 60], [160, 55],
+    [155, 52], [142, 48], [140, 45], [133, 43], [130, 35], [126, 35],
+    [122, 30], [121, 25], [110, 21], [108, 15], [105, 10], [104, 8],
+    [100, 6], [98, 8], [95, 16], [90, 22], [88, 21], [82, 17], [77, 8],
+    [73, 15], [70, 20], [65, 25], [60, 25], [56, 27], [52, 30], [48, 30],
+    [43, 40], [36, 36], [28, 36], [22, 40], [18, 40], [13, 38], [-10, 36],
+  ],
+  // Australia
+  [
+    [113, -22], [114, -26], [115, -32], [118, -35], [124, -34], [129, -32],
+    [134, -33], [138, -35], [141, -38], [147, -38], [150, -37], [153, -32],
+    [153, -26], [146, -19], [142, -11], [137, -12], [135, -15], [130, -13],
+    [124, -16], [122, -18], [117, -21], [113, -22],
+  ],
+]
+
+// ray-casting point-in-polygon on [lon, lat]
+function inPolygon(lon: number, lat: number, poly: number[][]): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0]
+    const yi = poly[i][1]
+    const xj = poly[j][0]
+    const yj = poly[j][1]
+    const intersect =
+      yi > lat !== yj > lat &&
+      lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi
+    if (intersect) inside = !inside
   }
-  return pts
+  return inside
+}
+
+function isLand(lat: number, lon: number): boolean {
+  if (lat < -62) return true // Antarctica ice cap
+  for (const poly of CONTINENTS) {
+    if (inPolygon(lon, lat, poly)) return true
+  }
+  return false
 }
 
 // lat/lon (degrees) -> point on unit sphere
@@ -26,6 +91,23 @@ function latLon(lat: number, lon: number): Vec3 {
     y: Math.sin(phi),
     z: Math.cos(phi) * Math.sin(lambda),
   }
+}
+
+// build land dots via fibonacci sphere, keeping only points over land
+function landDots(sampleCount: number): Vec3[] {
+  const pts: Vec3[] = []
+  const golden = Math.PI * (3 - Math.sqrt(5))
+  for (let i = 0; i < sampleCount; i++) {
+    const y = 1 - (i / (sampleCount - 1)) * 2
+    const r = Math.sqrt(1 - y * y)
+    const theta = golden * i
+    const x = Math.cos(theta) * r
+    const z = Math.sin(theta) * r
+    const lat = (Math.asin(y) * 180) / Math.PI
+    const lon = (Math.atan2(z, x) * 180) / Math.PI
+    if (isLand(lat, lon)) pts.push({ x, y, z })
+  }
+  return pts
 }
 
 const MARKERS: Vec3[] = [
@@ -50,9 +132,9 @@ export function Globe({ className }: { className?: string }) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const dots = fibonacciSphere(1100)
+    const dots = landDots(26000)
     let raf = 0
-    let angle = 0
+    let angle = -1.6 // start over the Atlantic-ish
     let size = 0
     let dpr = Math.min(window.devicePixelRatio || 1, 2)
 
@@ -76,61 +158,67 @@ export function Globe({ className }: { className?: string }) {
       const cos = Math.cos(angle)
       const sin = Math.sin(angle)
 
-      // faint sphere outline + inner shading
+      // ocean sphere fill + glow
+      const glow = ctx.createRadialGradient(
+        cx - R * 0.25,
+        cy - R * 0.25,
+        R * 0.1,
+        cx,
+        cy,
+        R,
+      )
+      glow.addColorStop(0, 'rgba(18, 60, 42, 0.55)')
+      glow.addColorStop(0.7, 'rgba(8, 28, 20, 0.45)')
+      glow.addColorStop(1, 'rgba(4, 14, 10, 0.15)')
       ctx.beginPath()
       ctx.arc(cx, cy, R, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(90, 240, 150, 0.25)'
+      ctx.fillStyle = glow
+      ctx.fill()
+
+      // rim
+      ctx.beginPath()
+      ctx.arc(cx, cy, R, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(90, 240, 150, 0.30)'
       ctx.lineWidth = 1 * dpr
       ctx.stroke()
 
-      const glow = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R)
-      glow.addColorStop(0, 'rgba(40, 200, 110, 0.10)')
-      glow.addColorStop(1, 'rgba(10, 30, 20, 0)')
-      ctx.fillStyle = glow
-      ctx.beginPath()
-      ctx.arc(cx, cy, R, 0, Math.PI * 2)
-      ctx.fill()
-
-      // rotate + project the dot field
+      // land dots (rotate around Y axis, hide far side)
       for (const p of dots) {
         const rx = p.x * cos + p.z * sin
         const rz = -p.x * sin + p.z * cos
-        const depth = (rz + 1) / 2 // 0 (back) .. 1 (front)
+        if (rz < 0) continue // back face hidden
+        const depth = rz // 0..1 toward viewer
         const px = cx + rx * R
         const py = cy - p.y * R
-        const radius = (0.5 + depth * 1.4) * dpr
-        const alpha = 0.12 + depth * 0.6
-        ctx.beginPath()
-        ctx.arc(px, py, radius, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(70, 230, 140, ${alpha})`
-        ctx.fill()
+        const s = (0.6 + depth * 1.0) * dpr
+        const alpha = 0.25 + depth * 0.65
+        ctx.fillStyle = `rgba(74, 234, 140, ${alpha})`
+        ctx.fillRect(px - s / 2, py - s / 2, s, s)
       }
 
-      // node markers with pulse
+      // pulsing node markers
       const t = performance.now() / 1000
       MARKERS.forEach((m, i) => {
         const rx = m.x * cos + m.z * sin
         const rz = -m.x * sin + m.z * cos
-        if (rz < -0.05) return // hide when on far side
+        if (rz < -0.02) return
         const depth = (rz + 1) / 2
         const px = cx + rx * R
         const py = cy - m.y * R
         const pulse = 0.5 + 0.5 * Math.sin(t * 2 + i)
-        const core = (2 + depth * 1.5) * dpr
+        const core = (1.6 + depth * 1.4) * dpr
 
-        // halo
         ctx.beginPath()
         ctx.arc(px, py, core + pulse * 6 * dpr, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(120, 255, 170, ${0.12 * depth})`
+        ctx.fillStyle = `rgba(120, 255, 170, ${0.14 * depth})`
         ctx.fill()
-        // core
         ctx.beginPath()
         ctx.arc(px, py, core, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(180, 255, 200, ${0.6 + depth * 0.4})`
+        ctx.fillStyle = `rgba(190, 255, 205, ${0.6 + depth * 0.4})`
         ctx.fill()
       })
 
-      angle += 0.0035
+      angle += 0.0032
       raf = requestAnimationFrame(draw)
     }
 
