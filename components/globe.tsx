@@ -110,6 +110,24 @@ function landDots(sampleCount: number): Vec3[] {
   return pts
 }
 
+type Blinker = Vec3 & { phase: number; speed: number; hi: boolean }
+
+// pick a random subset of land dots to twinkle independently
+function makeBlinkers(dots: Vec3[], count: number): Blinker[] {
+  const out: Blinker[] = []
+  const step = Math.max(1, Math.floor(dots.length / count))
+  for (let i = 0; i < dots.length; i += step) {
+    const p = dots[i]
+    out.push({
+      ...p,
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.8 + Math.random() * 2.6,
+      hi: Math.random() < 0.22, // some are brighter "hotspots"
+    })
+  }
+  return out
+}
+
 const MARKERS: Vec3[] = [
   latLon(40.7, -74), // New York
   latLon(51.5, -0.1), // London
@@ -133,6 +151,7 @@ export function Globe({ className }: { className?: string }) {
     if (!ctx) return
 
     const dots = landDots(26000)
+    const blinkers = makeBlinkers(dots, 320)
     let raf = 0
     let angle = -1.6 // start over the Atlantic-ish
     let size = 0
@@ -196,8 +215,32 @@ export function Globe({ className }: { className?: string }) {
         ctx.fillRect(px - s / 2, py - s / 2, s, s)
       }
 
-      // pulsing node markers
       const t = performance.now() / 1000
+
+      // scattered twinkling dots across the land
+      for (const b of blinkers) {
+        const rx = b.x * cos + b.z * sin
+        const rz = -b.x * sin + b.z * cos
+        if (rz < 0) continue
+        const depth = rz
+        const px = cx + rx * R
+        const py = cy - b.y * R
+        const blink = 0.5 + 0.5 * Math.sin(t * b.speed + b.phase)
+        const s = (b.hi ? 1.6 : 1.0) * (0.7 + depth * 0.9) * dpr
+        const alpha = (b.hi ? 0.5 : 0.3) + blink * 0.5 * depth
+        if (b.hi) {
+          ctx.beginPath()
+          ctx.arc(px, py, s + blink * 2.4 * dpr, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(120, 255, 170, ${0.12 * depth * blink})`
+          ctx.fill()
+        }
+        ctx.beginPath()
+        ctx.arc(px, py, s, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(150, 255, 190, ${alpha})`
+        ctx.fill()
+      }
+
+      // pulsing node markers
       MARKERS.forEach((m, i) => {
         const rx = m.x * cos + m.z * sin
         const rz = -m.x * sin + m.z * cos
