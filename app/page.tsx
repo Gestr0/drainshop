@@ -18,7 +18,7 @@ export default function Home() {
         {/* left: identity + globe */}
         <section className="flex w-full flex-col items-center text-center lg:items-start lg:text-left">
           <h1 className="text-4xl font-bold tracking-tight text-foreground text-balance sm:text-5xl">
-            DRAIN<span className="text-primary text-glow">SHOP</span>
+            DRAINER<span className="text-primary text-glow">SHOP</span>
           </h1>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
             Global access grid. Nodes are pinging in real time across the
